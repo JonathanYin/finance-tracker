@@ -23,6 +23,7 @@
 # misc
 .DS_Store
 *.pem
+.finance-tracker-data/
 
 # debug
 npm-debug.log*

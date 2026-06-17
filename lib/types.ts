@@ -29,6 +29,23 @@ export interface Expense {
 /** Fields the user supplies; everything else is filled in on create. */
 export type ExpenseInput = Omit<Expense, "id" | "createdAt" | "source">;
 
+export type BillingCycle = "monthly" | "yearly";
+
+export interface Subscription {
+  id: string;
+  name: string;
+  amount: number; // positive number, in dollars
+  billingCycle: BillingCycle;
+  nextBillingDate: string; // ISO yyyy-mm-dd
+  category: Category;
+  merchant: string;
+  notes: string;
+  createdAt: string; // ISO timestamp
+}
+
+/** Fields the user supplies; everything else is filled in on create. */
+export type SubscriptionInput = Omit<Subscription, "id" | "createdAt">;
+
 /**
  * Persistence boundary. The MVP ships a localStorage implementation, but a
  * future API / bank-sync store can be dropped in behind the same interface.
@@ -36,4 +53,9 @@ export type ExpenseInput = Omit<Expense, "id" | "createdAt" | "source">;
 export interface ExpenseStore {
   load(): Expense[];
   save(expenses: Expense[]): void;
+}
+
+export interface SubscriptionStore {
+  load(): Subscription[];
+  save(subscriptions: Subscription[]): void;
 }
