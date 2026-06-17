@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useExpenses } from "@/lib/expenses-context";
 import { CATEGORIES } from "@/lib/categories";
 import { todayISO } from "@/lib/format";
@@ -21,26 +21,22 @@ const emptyForm = () => ({
   merchant: "",
 });
 
+function formFromExpense(expense: Expense | null) {
+  if (!expense) return emptyForm();
+
+  return {
+    amount: String(expense.amount),
+    date: expense.date,
+    category: expense.category,
+    description: expense.description,
+    merchant: expense.merchant,
+  };
+}
+
 export default function ExpenseForm({ editing, onDone }: ExpenseFormProps) {
   const { addExpense, updateExpense } = useExpenses();
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState(() => formFromExpense(editing));
   const [error, setError] = useState<string | null>(null);
-
-  // Load the editing expense into the form (or reset when it clears).
-  useEffect(() => {
-    if (editing) {
-      setForm({
-        amount: String(editing.amount),
-        date: editing.date,
-        category: editing.category,
-        description: editing.description,
-        merchant: editing.merchant,
-      });
-    } else {
-      setForm(emptyForm());
-    }
-    setError(null);
-  }, [editing]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -74,7 +70,7 @@ export default function ExpenseForm({ editing, onDone }: ExpenseFormProps) {
 
   // form-input: canvas surface, hairline border, 6px radius, ~40px tall
   const inputClass =
-    "h-10 w-full rounded-sm border border-hairline bg-canvas px-3 text-sm text-ink outline-none transition-colors placeholder:text-mute focus:border-hairline-strong";
+    "h-10 w-full rounded-sm border border-hairline bg-canvas px-3 text-sm text-ink outline-none placeholder:text-mute focus:border-hairline-strong";
 
   const labelClass = "text-xs font-medium tracking-wide text-mute";
 
