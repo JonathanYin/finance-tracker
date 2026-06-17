@@ -1,4 +1,4 @@
-import type { Category } from "./types";
+import type { Category, IncomeCategory, SavingsDestination } from "./types";
 
 export const CATEGORIES: readonly Category[] = [
   "Food",
@@ -9,6 +9,18 @@ export const CATEGORIES: readonly Category[] = [
   "Health",
   "Travel",
   "Other",
+] as const;
+
+export const INCOME_CATEGORIES: readonly IncomeCategory[] = [
+  "Salary",
+  "Bonus",
+  "Interest",
+  "Other income",
+] as const;
+
+export const SAVINGS_DESTINATIONS: readonly SavingsDestination[] = [
+  "Schwab",
+  "Other savings",
 ] as const;
 
 /**

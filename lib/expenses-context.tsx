@@ -11,19 +11,29 @@ import type {
   BillingCycle,
   Expense,
   ExpenseInput,
+  ExpenseTransaction,
   Subscription,
   SubscriptionInput,
+  Transaction,
+  TransactionInput,
 } from "./types";
-import { localStorageStore, subscriptionsStorageStore } from "./storage";
+import {
+  subscriptionsStorageStore,
+  transactionsStorageStore,
+} from "./storage";
 import { todayISO } from "./format";
 
 interface ExpensesContextValue {
   expenses: Expense[];
+  transactions: Transaction[];
   subscriptions: Subscription[];
   hydrated: boolean;
   addExpense: (input: ExpenseInput) => void;
   updateExpense: (id: string, input: ExpenseInput) => void;
   deleteExpense: (id: string) => void;
+  addTransaction: (input: TransactionInput) => void;
+  updateTransaction: (id: string, input: TransactionInput) => void;
+  deleteTransaction: (id: string) => void;
   addSubscription: (input: SubscriptionInput) => void;
   updateSubscription: (id: string, input: SubscriptionInput) => void;
   deleteSubscription: (id: string) => void;
@@ -93,9 +103,13 @@ function advanceDueSubscriptions(subscriptions: Subscription[]) {
 }
 
 export function ExpensesProvider({ children }: { children: React.ReactNode }) {
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [hydrated, setHydrated] = useState(false);
+  const expenses = transactions.filter(
+    (transaction): transaction is ExpenseTransaction =>
+      transaction.type === "expense",
+  );
 
   // Hydrate from storage on mount (never during render → no SSR mismatch).
   useEffect(() => {
@@ -103,7 +117,7 @@ export function ExpensesProvider({ children }: { children: React.ReactNode }) {
 
     queueMicrotask(() => {
       if (cancelled) return;
-      setExpenses(localStorageStore.load());
+      setTransactions(transactionsStorageStore.load());
       setSubscriptions(advanceDueSubscriptions(subscriptionsStorageStore.load()));
       setHydrated(true);
     });
@@ -116,8 +130,8 @@ export function ExpensesProvider({ children }: { children: React.ReactNode }) {
   // Persist on every change, but only after the initial hydration so we
   // don't overwrite stored data with the empty initial state.
   useEffect(() => {
-    if (hydrated) localStorageStore.save(expenses);
-  }, [expenses, hydrated]);
+    if (hydrated) transactionsStorageStore.save(transactions);
+  }, [transactions, hydrated]);
 
   useEffect(() => {
     if (hydrated) subscriptionsStorageStore.save(subscriptions);
@@ -132,25 +146,61 @@ export function ExpensesProvider({ children }: { children: React.ReactNode }) {
     return () => window.clearInterval(intervalId);
   }, [hydrated]);
 
-  const addExpense = useCallback((input: ExpenseInput) => {
-    const expense: Expense = {
-      ...input,
+  const addTransaction = useCallback((input: TransactionInput) => {
+    const common = {
       id: crypto.randomUUID(),
       createdAt: new Date().toISOString(),
       source: "manual",
-    };
-    setExpenses((prev) => [expense, ...prev]);
+    } as const;
+
+    const transaction: Transaction =
+      input.type === "expense"
+        ? { ...input, ...common, notes: "" }
+        : { ...input, ...common };
+
+    setTransactions((prev) => [transaction, ...prev]);
   }, []);
 
-  const updateExpense = useCallback((id: string, input: ExpenseInput) => {
-    setExpenses((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, ...input } : e)),
+  const updateTransaction = useCallback(
+    (id: string, input: TransactionInput) => {
+      setTransactions((prev) =>
+        prev.map((transaction) => {
+          if (transaction.id !== id) return transaction;
+          const common = {
+            id: transaction.id,
+            createdAt: transaction.createdAt,
+            source: transaction.source,
+          };
+          if (input.type === "expense") {
+            return { ...input, ...common, notes: "" };
+          }
+          return { ...input, ...common };
+        }),
+      );
+    },
+    [],
+  );
+
+  const deleteTransaction = useCallback((id: string) => {
+    setTransactions((prev) =>
+      prev.filter((transaction) => transaction.id !== id),
     );
   }, []);
 
+  const addExpense = useCallback(
+    (input: ExpenseInput) => {
+      addTransaction({ ...input, type: "expense" });
+    },
+    [addTransaction],
+  );
+
+  const updateExpense = useCallback((id: string, input: ExpenseInput) => {
+    updateTransaction(id, { ...input, type: "expense" });
+  }, [updateTransaction]);
+
   const deleteExpense = useCallback((id: string) => {
-    setExpenses((prev) => prev.filter((e) => e.id !== id));
-  }, []);
+    deleteTransaction(id);
+  }, [deleteTransaction]);
 
   const addSubscription = useCallback((input: SubscriptionInput) => {
     const subscription: Subscription = {
@@ -182,11 +232,15 @@ export function ExpensesProvider({ children }: { children: React.ReactNode }) {
     <ExpensesContext.Provider
       value={{
         expenses,
+        transactions,
         subscriptions,
         hydrated,
         addExpense,
         updateExpense,
         deleteExpense,
+        addTransaction,
+        updateTransaction,
+        deleteTransaction,
         addSubscription,
         updateSubscription,
         deleteSubscription,

@@ -29,6 +29,64 @@ export interface Expense {
 /** Fields the user supplies; everything else is filled in on create. */
 export type ExpenseInput = Omit<Expense, "id" | "createdAt" | "source">;
 
+export type TransactionType = "expense" | "income" | "savings_transfer";
+
+export type IncomeCategory = "Salary" | "Bonus" | "Interest" | "Other income";
+
+export type SavingsDestination = "Schwab" | "Other savings";
+
+interface TransactionBase {
+  id: string;
+  amount: number; // positive number, in dollars
+  date: string; // ISO yyyy-mm-dd
+  createdAt: string; // ISO timestamp
+  source: ExpenseSource;
+  notes: string;
+}
+
+export interface ExpenseTransaction extends TransactionBase {
+  type: "expense";
+  category: Category;
+  description: string;
+  merchant: string;
+}
+
+export interface IncomeTransaction extends TransactionBase {
+  type: "income";
+  category: IncomeCategory;
+  payer: string;
+}
+
+export interface SavingsTransferTransaction extends TransactionBase {
+  type: "savings_transfer";
+  destination: SavingsDestination;
+}
+
+export type Transaction =
+  | ExpenseTransaction
+  | IncomeTransaction
+  | SavingsTransferTransaction;
+
+export type ExpenseTransactionInput = Omit<
+  ExpenseTransaction,
+  "id" | "createdAt" | "source" | "type" | "notes"
+>;
+
+export type IncomeTransactionInput = Omit<
+  IncomeTransaction,
+  "id" | "createdAt" | "source" | "type"
+>;
+
+export type SavingsTransferTransactionInput = Omit<
+  SavingsTransferTransaction,
+  "id" | "createdAt" | "source" | "type"
+>;
+
+export type TransactionInput =
+  | ({ type: "expense" } & ExpenseTransactionInput)
+  | ({ type: "income" } & IncomeTransactionInput)
+  | ({ type: "savings_transfer" } & SavingsTransferTransactionInput);
+
 export type BillingCycle = "monthly" | "yearly";
 
 export interface Subscription {
@@ -53,6 +111,11 @@ export type SubscriptionInput = Omit<Subscription, "id" | "createdAt">;
 export interface ExpenseStore {
   load(): Expense[];
   save(expenses: Expense[]): void;
+}
+
+export interface TransactionStore {
+  load(): Transaction[];
+  save(transactions: Transaction[]): void;
 }
 
 export interface SubscriptionStore {

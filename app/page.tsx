@@ -7,17 +7,28 @@ import { hrefWithParam } from "@/lib/url-params";
 import SummaryHeader from "@/components/SummaryHeader";
 import ExpenseForm from "@/components/ExpenseForm";
 import ExpenseList from "@/components/ExpenseList";
+import CashflowForm from "@/components/CashflowForm";
+import CashflowList from "@/components/CashflowList";
+import CashflowSummary from "@/components/CashflowSummary";
 import SubscriptionForm from "@/components/SubscriptionForm";
 import SubscriptionList from "@/components/SubscriptionList";
 import SubscriptionsSummary from "@/components/SubscriptionsSummary";
 import ThemeToggle from "@/components/ThemeToggle";
-import type { Expense, Subscription } from "@/lib/types";
+import type {
+  Expense,
+  IncomeTransaction,
+  SavingsTransferTransaction,
+  Subscription,
+} from "@/lib/types";
 
-type ActiveTab = "expenses" | "subscriptions";
+type ActiveTab = "expenses" | "cashflow" | "subscriptions";
+type CashflowTransaction = IncomeTransaction | SavingsTransferTransaction;
 
 export default function Home() {
   const { hydrated } = useExpenses();
   const [editing, setEditing] = useState<Expense | null>(null);
+  const [editingCashflow, setEditingCashflow] =
+    useState<CashflowTransaction | null>(null);
   const [editingSubscription, setEditingSubscription] =
     useState<Subscription | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>("expenses");
@@ -25,20 +36,21 @@ export default function Home() {
   function selectTab(tab: ActiveTab) {
     setActiveTab(tab);
     setEditing(null);
+    setEditingCashflow(null);
     setEditingSubscription(null);
   }
 
   return (
     <>
       <ThemeToggle />
-      <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 sm:py-12">
-        <header className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
+        <header className="mb-8 flex flex-col gap-5">
           <div>
             <h1 className="mb-1 text-2xl font-semibold tracking-tight text-ink">
               Finance Tracker
             </h1>
             <p className="text-sm text-body">
-              Track expenses and recurring subscriptions.
+              Track spending, income, savings, and recurring subscriptions.
             </p>
           </div>
           <FinanceTabs activeTab={activeTab} onSelectTab={selectTab} />
@@ -47,28 +59,62 @@ export default function Home() {
         {!hydrated ? (
           <div className="py-20 text-center text-sm text-mute">Loading…</div>
         ) : activeTab === "expenses" ? (
-          <div className="flex flex-col gap-6">
-            <SummaryHeader />
-            <ExpenseForm
-              key={editing?.id ?? "new"}
-              editing={editing}
-              onDone={() => setEditing(null)}
-            />
-            <ExpenseList onEdit={setEditing} />
-          </div>
+          <DashboardTab
+            summary={<SummaryHeader />}
+            form={
+              <ExpenseForm
+                key={editing?.id ?? "new"}
+                editing={editing}
+                onDone={() => setEditing(null)}
+              />
+            }
+            list={<ExpenseList onEdit={setEditing} />}
+          />
+        ) : activeTab === "cashflow" ? (
+          <DashboardTab
+            summary={<CashflowSummary />}
+            form={
+              <CashflowForm
+                key={editingCashflow?.id ?? "new"}
+                editing={editingCashflow}
+                onDone={() => setEditingCashflow(null)}
+              />
+            }
+            list={<CashflowList onEdit={setEditingCashflow} />}
+          />
         ) : (
-          <div className="flex flex-col gap-6">
-            <SubscriptionsSummary />
-            <SubscriptionForm
-              key={editingSubscription?.id ?? "new"}
-              editing={editingSubscription}
-              onDone={() => setEditingSubscription(null)}
-            />
-            <SubscriptionList onEdit={setEditingSubscription} />
-          </div>
+          <DashboardTab
+            summary={<SubscriptionsSummary />}
+            form={
+              <SubscriptionForm
+                key={editingSubscription?.id ?? "new"}
+                editing={editingSubscription}
+                onDone={() => setEditingSubscription(null)}
+              />
+            }
+            list={<SubscriptionList onEdit={setEditingSubscription} />}
+          />
         )}
       </main>
     </>
+  );
+}
+
+interface DashboardTabProps {
+  summary: React.ReactNode;
+  form: React.ReactNode;
+  list: React.ReactNode;
+}
+
+function DashboardTab({ summary, form, list }: DashboardTabProps) {
+  return (
+    <div className="flex flex-col gap-6">
+      {summary}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+        <aside className="min-w-0 order-1 lg:order-2">{form}</aside>
+        <div className="min-w-0 order-2 lg:order-1">{list}</div>
+      </div>
+    </div>
   );
 }
 
@@ -112,7 +158,7 @@ function FinanceTabsWithUrl({ activeTab, onSelectTab }: FinanceTabsProps) {
 function TabButtons({ activeTab, onSelectTab }: FinanceTabsProps) {
   const tabClass = (tab: ActiveTab) =>
     [
-      "h-9 rounded-sm px-3 text-sm font-medium transition-colors",
+      "h-9 min-w-0 rounded-sm px-2 text-xs font-medium transition-colors sm:px-3 sm:text-sm",
       activeTab === tab
         ? "bg-ink text-on-primary"
         : "text-body hover:bg-canvas-soft-2 hover:text-ink",
@@ -120,7 +166,7 @@ function TabButtons({ activeTab, onSelectTab }: FinanceTabsProps) {
 
   return (
     <div
-      className="grid w-full grid-cols-2 gap-1 rounded-md border border-hairline bg-canvas p-1 shadow-card sm:w-auto"
+      className="grid w-full grid-cols-3 gap-1 rounded-md border border-hairline bg-canvas p-1 shadow-card"
       aria-label="Finance views"
     >
       <button
@@ -130,6 +176,14 @@ function TabButtons({ activeTab, onSelectTab }: FinanceTabsProps) {
         aria-pressed={activeTab === "expenses"}
       >
         Expenses
+      </button>
+      <button
+        type="button"
+        onClick={() => onSelectTab("cashflow")}
+        className={tabClass("cashflow")}
+        aria-pressed={activeTab === "cashflow"}
+      >
+        Cashflow
       </button>
       <button
         type="button"
