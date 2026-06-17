@@ -33,6 +33,10 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+
+# local backend data for the personal finance tracker
+.finance-tracker-data/
 
 # vercel
 .vercel

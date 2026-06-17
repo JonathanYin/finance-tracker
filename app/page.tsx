@@ -9,13 +9,14 @@ import SubscriptionForm from "@/components/SubscriptionForm";
 import SubscriptionList from "@/components/SubscriptionList";
 import SubscriptionsSummary from "@/components/SubscriptionsSummary";
 import ThemeToggle from "@/components/ThemeToggle";
-import type { Expense, Subscription } from "@/lib/types";
+import IntegrationsPanel from "@/components/IntegrationsPanel";
+import type { Subscription, Transaction } from "@/lib/types";
 
 type ActiveTab = "expenses" | "subscriptions";
 
 export default function Home() {
-  const { hydrated } = useExpenses();
-  const [editing, setEditing] = useState<Expense | null>(null);
+  const { hydrated, error } = useExpenses();
+  const [editing, setEditing] = useState<Transaction | null>(null);
   const [editingSubscription, setEditingSubscription] =
     useState<Subscription | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>("expenses");
@@ -37,7 +38,7 @@ export default function Home() {
   return (
     <>
       <ThemeToggle />
-      <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 sm:py-12">
+      <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 sm:px-6 sm:py-12">
         <header className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="mb-1 text-2xl font-semibold tracking-tight text-ink">
@@ -71,26 +72,37 @@ export default function Home() {
         </header>
 
         {!hydrated ? (
-          <div className="py-20 text-center text-sm text-mute">Loading…</div>
-        ) : activeTab === "expenses" ? (
-          <div className="flex flex-col gap-6">
-            <SummaryHeader />
-            <ExpenseForm
-              key={editing?.id ?? "new"}
-              editing={editing}
-              onDone={() => setEditing(null)}
-            />
-            <ExpenseList onEdit={setEditing} />
-          </div>
+          <div className="py-20 text-center text-sm text-mute">Loading...</div>
         ) : (
           <div className="flex flex-col gap-6">
-            <SubscriptionsSummary />
-            <SubscriptionForm
-              key={editingSubscription?.id ?? "new"}
-              editing={editingSubscription}
-              onDone={() => setEditingSubscription(null)}
-            />
-            <SubscriptionList onEdit={setEditingSubscription} />
+            {error && (
+              <div className="rounded-sm border border-error-soft bg-canvas px-3 py-2 text-sm text-error">
+                {error}
+              </div>
+            )}
+
+            {activeTab === "expenses" ? (
+              <>
+                <SummaryHeader />
+                <IntegrationsPanel />
+                <ExpenseForm
+                  key={editing?.id ?? "new"}
+                  editing={editing}
+                  onDone={() => setEditing(null)}
+                />
+                <ExpenseList onEdit={setEditing} />
+              </>
+            ) : (
+              <>
+                <SubscriptionsSummary />
+                <SubscriptionForm
+                  key={editingSubscription?.id ?? "new"}
+                  editing={editingSubscription}
+                  onDone={() => setEditingSubscription(null)}
+                />
+                <SubscriptionList onEdit={setEditingSubscription} />
+              </>
+            )}
           </div>
         )}
       </main>

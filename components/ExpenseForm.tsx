@@ -4,12 +4,10 @@ import { useState } from "react";
 import { useExpenses } from "@/lib/expenses-context";
 import { CATEGORIES } from "@/lib/categories";
 import { todayISO } from "@/lib/format";
-import type { Category, Expense } from "@/lib/types";
+import type { Category, Transaction, TransactionType } from "@/lib/types";
 
 interface ExpenseFormProps {
-  /** When set, the form edits this expense instead of adding a new one. */
-  editing: Expense | null;
-  /** Called after a successful submit or cancel, to clear edit state. */
+  editing: Transaction | null;
   onDone: () => void;
 }
 
@@ -19,26 +17,28 @@ const emptyForm = () => ({
   category: "Food" as Category,
   description: "",
   merchant: "",
+  type: "expense" as TransactionType,
 });
 
-function formFromExpense(expense: Expense | null) {
-  if (!expense) return emptyForm();
+function formFromTransaction(transaction: Transaction | null) {
+  if (!transaction) return emptyForm();
 
   return {
-    amount: String(expense.amount),
-    date: expense.date,
-    category: expense.category,
-    description: expense.description,
-    merchant: expense.merchant,
+    amount: String(transaction.amount),
+    date: transaction.date,
+    category: transaction.category,
+    description: transaction.description,
+    merchant: transaction.merchant,
+    type: transaction.type,
   };
 }
 
 export default function ExpenseForm({ editing, onDone }: ExpenseFormProps) {
-  const { addExpense, updateExpense } = useExpenses();
-  const [form, setForm] = useState(() => formFromExpense(editing));
+  const { addTransaction, updateTransaction } = useExpenses();
+  const [form, setForm] = useState(() => formFromTransaction(editing));
   const [error, setError] = useState<string | null>(null);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const amount = parseFloat(form.amount);
     if (!Number.isFinite(amount) || amount <= 0) {
@@ -56,22 +56,27 @@ export default function ExpenseForm({ editing, onDone }: ExpenseFormProps) {
       category: form.category,
       description: form.description.trim(),
       merchant: form.merchant.trim(),
+      type: form.type,
     };
 
-    if (editing) {
-      updateExpense(editing.id, input);
-    } else {
-      addExpense(input);
+    try {
+      if (editing) {
+        await updateTransaction(editing.id, input);
+      } else {
+        await addTransaction(input);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save transaction.");
+      return;
     }
+
     setForm(emptyForm());
     setError(null);
     onDone();
   }
 
-  // form-input: canvas surface, hairline border, 6px radius, ~40px tall
   const inputClass =
     "h-10 w-full rounded-sm border border-hairline bg-canvas px-3 text-sm text-ink outline-none placeholder:text-mute focus:border-hairline-strong";
-
   const labelClass = "text-xs font-medium tracking-wide text-mute";
 
   return (
@@ -80,10 +85,25 @@ export default function ExpenseForm({ editing, onDone }: ExpenseFormProps) {
       className="rounded-lg bg-canvas p-4 shadow-card sm:p-5"
     >
       <h2 className="mb-4 text-base font-semibold tracking-tight text-ink">
-        {editing ? "Edit expense" : "Add expense"}
+        {editing ? "Edit transaction" : "Add transaction"}
       </h2>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <label className="flex flex-col gap-1.5 text-sm">
+          <span className={labelClass}>Type</span>
+          <select
+            value={form.type}
+            onChange={(e) =>
+              setForm({ ...form, type: e.target.value as TransactionType })
+            }
+            className={inputClass}
+          >
+            <option value="expense">Expense</option>
+            <option value="income">Income</option>
+            <option value="transfer">Transfer</option>
+          </select>
+        </label>
+
         <label className="flex flex-col gap-1.5 text-sm">
           <span className={labelClass}>Amount</span>
           <input
@@ -119,9 +139,9 @@ export default function ExpenseForm({ editing, onDone }: ExpenseFormProps) {
             }
             className={inputClass}
           >
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
+            {CATEGORIES.map((category) => (
+              <option key={category} value={category}>
+                {category}
               </option>
             ))}
           </select>
@@ -157,7 +177,7 @@ export default function ExpenseForm({ editing, onDone }: ExpenseFormProps) {
           type="submit"
           className="h-10 rounded-sm bg-ink px-4 text-sm font-medium text-on-primary transition-opacity hover:opacity-90"
         >
-          {editing ? "Save changes" : "Add expense"}
+          {editing ? "Save changes" : "Add transaction"}
         </button>
         {editing && (
           <button

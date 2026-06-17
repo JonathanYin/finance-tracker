@@ -12,16 +12,18 @@ both Claude Code and other agents stay in sync.
 
 ## What this is
 
-A personal finance tracker. The MVP lets you add / edit / delete expenses,
-persisted in the browser via `localStorage`. No backend, database, or auth.
-Single client-rendered page.
+A personal finance tracker. It now tracks transactions, not only expenses:
+spend, income, and transfers/savings are separate record types. The original
+browser `localStorage` MVP data is imported once into a local backend JSON store.
+There is still no auth or hosted database.
 
 ## Stack
 
 - Next.js 16 (App Router) + React 19 + TypeScript (strict)
 - Tailwind CSS v4 (configured via `@theme` in `app/globals.css`, no JS config)
-- No runtime dependencies beyond the framework — uses native `Intl` and
-  `crypto.randomUUID`. Do not add libraries without a clear need.
+- No runtime dependencies beyond the framework — uses native `Intl`, `fetch`,
+  Node file APIs, Node crypto, and `crypto.randomUUID`. Do not add libraries
+  without a clear need.
 
 ## Commands
 
@@ -32,40 +34,49 @@ Single client-rendered page.
 
 ## Architecture
 
-State lives in a React Context backed by a swappable storage layer, so future
-data sources slot in behind the same interface without touching components.
+State lives in a React Context backed by App Router API routes and a local
+server-side JSON store. Provider integrations slot in through route handlers,
+then normalize into the shared `Transaction` model.
 
 ```
 app/
   layout.tsx            # metadata + wraps children in <ExpensesProvider>
   page.tsx              # "use client" dashboard; holds `editing` state
+  api/                  # transactions + import/integration route handlers
   globals.css           # design tokens (see Design) + Tailwind import
 components/
-  SummaryHeader.tsx     # total / this-year / this-month + by-category breakdown
-  ExpenseForm.tsx       # shared add + edit form
+  SummaryHeader.tsx     # spend / income / saved + by-category spend
+  IntegrationsPanel.tsx # Plaid, receipt upload, Gmail configuration surface
+  ExpenseForm.tsx       # shared add + edit transaction form
   ExpenseList.tsx       # list sorted by date desc
   ExpenseItem.tsx       # one row (details + Edit/Delete)
 lib/
-  types.ts              # Expense, ExpenseInput, Category, ExpenseSource, ExpenseStore
+  types.ts              # Transaction model + source/account/import metadata
+  server-store.ts       # .finance-tracker-data/finance.json persistence
+  server-crypto.ts      # AES-GCM token encryption
+  plaid.ts              # Plaid Link/exchange/sync helpers
   categories.ts         # preset CATEGORIES + shared BADGE_CLASS
-  storage.ts            # localStorageStore: ExpenseStore (key finance-tracker:expenses)
+  storage.ts            # legacy localStorage reader for one-time migration
   format.ts             # formatCurrency / formatDate / todayISO
   expenses-context.tsx  # ExpensesProvider + useExpenses() hook
-  README.md             # data-layer extension notes (READ before changing the model)
+  README.md             # data-layer notes (READ before changing the model)
 ```
 
-Data flow: components call `useExpenses()` → mutations update state and persist
-through `localStorageStore`. Every expense gets `id`, `createdAt`, and a
-`source` field (`"manual"` today) on create.
+Data flow: components call `useExpenses()` -> `/api/transactions` route handlers
+-> `server-store.ts`. Every transaction has `type`, `source`, `reviewStatus`,
+timestamps, and optional provider identifiers for de-duplication.
 
 ## Conventions & gotchas
 
-- All interactive components are `"use client"`. `localStorage` access is
-  SSR-guarded (`typeof window !== "undefined"`); the provider hydrates in a
-  `useEffect`, never during render — preserve this to avoid hydration mismatch.
-  There's a `hydrated` flag; the page shows a loading state until it's true.
+- All interactive components are `"use client"`. Legacy `localStorage` access is
+  SSR-guarded and only used during provider hydration for one-time migration.
+  Preserve the `hydrated` flag so the page does not render before API data loads.
 - Dates are ISO `yyyy-mm-dd` strings, parsed as local time in `format.ts` to
   avoid UTC off-by-one. Use `todayISO()` for defaults.
+- Keep amounts positive; `type: "expense" | "income" | "transfer"` defines
+  summary behavior.
+- Plaid access tokens must only be stored encrypted with `FINANCE_TRACKER_SECRET`.
+  Do not put provider tokens or local `.finance-tracker-data` contents in git.
 - Match the existing style: Tailwind utility classes only, tokens over raw
   colors (e.g. `text-ink`, `bg-canvas`, `border-hairline`).
 
@@ -88,17 +99,16 @@ before building any new UI. Tokens are defined in `app/globals.css` via
 
 Future direction — see `lib/README.md` for the detailed model implications:
 
-- **Bank integrations (Schwab, BofA)** and **email/receipt parsing** to
-  auto-create transactions. These need a server (API routes + OAuth / an
-  aggregator, or server-side parsing) — not possible purely client-side. New
-  sources set their own `source` value; de-dup on `source` + amount + date.
-- **Income & savings**: salary (a BofA inflow) and Schwab deposits (transfers to
-  savings) don't fit the expense/outflow shape. Plan is to add
-  `type: "expense" | "income" | "transfer"` (rename `Expense` → `Transaction`)
-  so summary math can split spend / income / saved / net.
+- **Plaid production hardening:** institution naming, webhook verification,
+  cursor persistence, re-auth/update mode, and investment transaction coverage.
+- **Receipt OCR:** the upload route creates reviewable drafts; wire Google
+  Document AI `EXPENSE_PROCESSOR` once credentials and processor config exist.
+- **Gmail receipts:** add Google OAuth, token storage, manual sync, then Pub/Sub
+  watch renewal. `gmail.readonly` is restricted and may require Google review.
 
 ## Constraints
 
 - Don't introduce a hosting/deploy step or recommend a host without asking; this
   runs locally via `npm run dev` for now.
-- Keep the MVP dependency-light and the storage layer behind `ExpenseStore`.
+- Keep the app dependency-light. Prefer native platform APIs until a dependency
+  removes real integration complexity.

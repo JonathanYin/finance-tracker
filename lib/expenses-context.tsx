@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from "react";
 import type {
@@ -13,23 +14,44 @@ import type {
   ExpenseInput,
   Subscription,
   SubscriptionInput,
+  Transaction,
+  TransactionInput,
 } from "./types";
 import { localStorageStore, subscriptionsStorageStore } from "./storage";
 import { todayISO } from "./format";
 
 interface ExpensesContextValue {
-  expenses: Expense[];
+  expenses: Transaction[];
+  transactions: Transaction[];
   subscriptions: Subscription[];
   hydrated: boolean;
-  addExpense: (input: ExpenseInput) => void;
-  updateExpense: (id: string, input: ExpenseInput) => void;
-  deleteExpense: (id: string) => void;
+  error: string | null;
+  refresh: () => Promise<void>;
+  addExpense: (input: ExpenseInput) => Promise<void>;
+  updateExpense: (id: string, input: ExpenseInput) => Promise<void>;
+  deleteExpense: (id: string) => Promise<void>;
+  addTransaction: (input: TransactionInput) => Promise<void>;
+  updateTransaction: (id: string, input: TransactionInput) => Promise<void>;
+  deleteTransaction: (id: string) => Promise<void>;
   addSubscription: (input: SubscriptionInput) => void;
   updateSubscription: (id: string, input: SubscriptionInput) => void;
   deleteSubscription: (id: string) => void;
 }
 
 const ExpensesContext = createContext<ExpensesContextValue | null>(null);
+const LOCAL_IMPORT_MARKER = "finance-tracker:local-imported";
+
+async function readJson<T>(response: Response): Promise<T> {
+  const json = (await response.json()) as T & { error?: string };
+  if (!response.ok) {
+    throw new Error(json.error ?? "Request failed.");
+  }
+  return json;
+}
+
+function toExpenseTransaction(input: ExpenseInput): TransactionInput {
+  return { ...input, type: "expense" };
+}
 
 function parseISODate(iso: string) {
   const [year, month, day] = iso.split("-").map(Number);
@@ -93,31 +115,57 @@ function advanceDueSubscriptions(subscriptions: Subscription[]) {
 }
 
 export function ExpensesProvider({ children }: { children: React.ReactNode }) {
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [hydrated, setHydrated] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Hydrate from storage on mount (never during render → no SSR mismatch).
+  const refresh = useCallback(async () => {
+    const json = await readJson<{ transactions: Transaction[] }>(
+      await fetch("/api/transactions", { cache: "no-store" }),
+    );
+    setTransactions(json.transactions);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 
-    queueMicrotask(() => {
-      if (cancelled) return;
-      setExpenses(localStorageStore.load());
-      setSubscriptions(advanceDueSubscriptions(subscriptionsStorageStore.load()));
-      setHydrated(true);
-    });
+    async function hydrate() {
+      try {
+        setSubscriptions(advanceDueSubscriptions(subscriptionsStorageStore.load()));
+        await refresh();
 
+        if (typeof window !== "undefined") {
+          const legacy = localStorageStore.load();
+          const alreadyImported = window.localStorage.getItem(LOCAL_IMPORT_MARKER);
+          if (legacy.length > 0 && !alreadyImported) {
+            await readJson<{ transactions: Expense[] }>(
+              await fetch("/api/import/local", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ expenses: legacy }),
+              }),
+            );
+            window.localStorage.setItem(LOCAL_IMPORT_MARKER, "1");
+            await refresh();
+          }
+        }
+
+        if (!cancelled) setError(null);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load data.");
+        }
+      } finally {
+        if (!cancelled) setHydrated(true);
+      }
+    }
+
+    hydrate();
     return () => {
       cancelled = true;
     };
-  }, []);
-
-  // Persist on every change, but only after the initial hydration so we
-  // don't overwrite stored data with the empty initial state.
-  useEffect(() => {
-    if (hydrated) localStorageStore.save(expenses);
-  }, [expenses, hydrated]);
+  }, [refresh]);
 
   useEffect(() => {
     if (hydrated) subscriptionsStorageStore.save(subscriptions);
@@ -132,24 +180,47 @@ export function ExpensesProvider({ children }: { children: React.ReactNode }) {
     return () => window.clearInterval(intervalId);
   }, [hydrated]);
 
-  const addExpense = useCallback((input: ExpenseInput) => {
-    const expense: Expense = {
-      ...input,
-      id: crypto.randomUUID(),
-      createdAt: new Date().toISOString(),
-      source: "manual",
-    };
-    setExpenses((prev) => [expense, ...prev]);
-  }, []);
+  const addTransaction = useCallback(
+    async (input: TransactionInput) => {
+      const json = await readJson<{ transaction: Transaction }>(
+        await fetch("/api/transactions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...input,
+            source: "manual",
+            reviewStatus: "accepted",
+          }),
+        }),
+      );
+      setTransactions((prev) => [json.transaction, ...prev]);
+    },
+    [],
+  );
 
-  const updateExpense = useCallback((id: string, input: ExpenseInput) => {
-    setExpenses((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, ...input } : e)),
+  const updateTransaction = useCallback(
+    async (id: string, input: TransactionInput) => {
+      const json = await readJson<{ transaction: Transaction }>(
+        await fetch(`/api/transactions/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(input),
+        }),
+      );
+      setTransactions((prev) =>
+        prev.map((transaction) =>
+          transaction.id === id ? json.transaction : transaction,
+        ),
+      );
+    },
+    [],
+  );
+
+  const deleteTransaction = useCallback(async (id: string) => {
+    await readJson<{ ok: boolean }>(
+      await fetch(`/api/transactions/${id}`, { method: "DELETE" }),
     );
-  }, []);
-
-  const deleteExpense = useCallback((id: string) => {
-    setExpenses((prev) => prev.filter((e) => e.id !== id));
+    setTransactions((prev) => prev.filter((transaction) => transaction.id !== id));
   }, []);
 
   const addSubscription = useCallback((input: SubscriptionInput) => {
@@ -178,20 +249,42 @@ export function ExpensesProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
+  const value = useMemo<ExpensesContextValue>(
+    () => ({
+      expenses: transactions,
+      transactions,
+      subscriptions,
+      hydrated,
+      error,
+      refresh,
+      addExpense: (input) => addTransaction(toExpenseTransaction(input)),
+      updateExpense: (id, input) =>
+        updateTransaction(id, toExpenseTransaction(input)),
+      deleteExpense: deleteTransaction,
+      addTransaction,
+      updateTransaction,
+      deleteTransaction,
+      addSubscription,
+      updateSubscription,
+      deleteSubscription,
+    }),
+    [
+      addSubscription,
+      addTransaction,
+      deleteSubscription,
+      deleteTransaction,
+      error,
+      hydrated,
+      refresh,
+      subscriptions,
+      transactions,
+      updateSubscription,
+      updateTransaction,
+    ],
+  );
+
   return (
-    <ExpensesContext.Provider
-      value={{
-        expenses,
-        subscriptions,
-        hydrated,
-        addExpense,
-        updateExpense,
-        deleteExpense,
-        addSubscription,
-        updateSubscription,
-        deleteSubscription,
-      }}
-    >
+    <ExpensesContext.Provider value={value}>
       {children}
     </ExpensesContext.Provider>
   );

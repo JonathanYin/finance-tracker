@@ -7,23 +7,37 @@ import { formatCurrency } from "@/lib/format";
 import type { Category } from "@/lib/types";
 
 export default function SummaryHeader() {
-  const { expenses } = useExpenses();
+  const { transactions } = useExpenses();
 
   const { stats, byCategory } = useMemo(() => {
     const now = new Date();
     const yearPrefix = String(now.getFullYear());
     const monthPrefix = `${yearPrefix}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
-    let total = 0;
-    let monthTotal = 0;
-    let yearTotal = 0;
+    let spend = 0;
+    let income = 0;
+    let saved = 0;
+    let monthSpend = 0;
+    let yearSpend = 0;
     const byCategory = new Map<Category, number>();
 
-    for (const e of expenses) {
-      total += e.amount;
-      if (e.date.startsWith(monthPrefix)) monthTotal += e.amount;
-      if (e.date.startsWith(yearPrefix)) yearTotal += e.amount;
-      byCategory.set(e.category, (byCategory.get(e.category) ?? 0) + e.amount);
+    for (const transaction of transactions) {
+      if (transaction.type === "income") {
+        income += transaction.amount;
+        continue;
+      }
+      if (transaction.type === "transfer") {
+        saved += transaction.amount;
+        continue;
+      }
+
+      spend += transaction.amount;
+      if (transaction.date.startsWith(monthPrefix)) monthSpend += transaction.amount;
+      if (transaction.date.startsWith(yearPrefix)) yearSpend += transaction.amount;
+      byCategory.set(
+        transaction.category,
+        (byCategory.get(transaction.category) ?? 0) + transaction.amount,
+      );
     }
 
     const sortedCategories = [...byCategory.entries()].sort(
@@ -31,17 +45,19 @@ export default function SummaryHeader() {
     );
 
     const stats = [
-      { label: "Total spent", value: total },
-      { label: "This year", value: yearTotal },
-      { label: "This month", value: monthTotal },
+      { label: "Spend", value: spend },
+      { label: "Income", value: income },
+      { label: "Saved", value: saved },
+      { label: "Year spend", value: yearSpend },
+      { label: "Month spend", value: monthSpend },
     ];
 
     return { stats, byCategory: sortedCategories };
-  }, [expenses]);
+  }, [transactions]);
 
   return (
     <section className="rounded-lg bg-canvas p-5 shadow-card sm:p-6">
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
         {stats.map((stat) => (
           <div key={stat.label}>
             <div className="font-mono text-xs uppercase tracking-wide text-mute">
