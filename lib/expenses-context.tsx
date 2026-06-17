@@ -8,12 +8,14 @@ import {
   useState,
 } from "react";
 import type {
+  BillingCycle,
   Expense,
   ExpenseInput,
   Subscription,
   SubscriptionInput,
 } from "./types";
 import { localStorageStore, subscriptionsStorageStore } from "./storage";
+import { todayISO } from "./format";
 
 interface ExpensesContextValue {
   expenses: Expense[];
@@ -29,6 +31,67 @@ interface ExpensesContextValue {
 
 const ExpensesContext = createContext<ExpensesContextValue | null>(null);
 
+function parseISODate(iso: string) {
+  const [year, month, day] = iso.split("-").map(Number);
+  if (!year || !month || !day) return null;
+  return { year, month, day };
+}
+
+function formatISODate(year: number, month: number, day: number) {
+  return [
+    String(year),
+    String(month).padStart(2, "0"),
+    String(day).padStart(2, "0"),
+  ].join("-");
+}
+
+function daysInMonth(year: number, month: number) {
+  return new Date(year, month, 0).getDate();
+}
+
+function addMonthsClamped(iso: string, monthsToAdd: number) {
+  const parsed = parseISODate(iso);
+  if (!parsed) return iso;
+
+  const monthIndex = parsed.month - 1 + monthsToAdd;
+  const targetYear = parsed.year + Math.floor(monthIndex / 12);
+  const targetMonthIndex = ((monthIndex % 12) + 12) % 12;
+  const targetMonth = targetMonthIndex + 1;
+  const targetDay = Math.min(
+    parsed.day,
+    daysInMonth(targetYear, targetMonth),
+  );
+
+  return formatISODate(targetYear, targetMonth, targetDay);
+}
+
+function advanceBillingDate(
+  nextBillingDate: string,
+  billingCycle: BillingCycle,
+  today = todayISO(),
+) {
+  if (nextBillingDate > today) return nextBillingDate;
+
+  const monthsToAdd = billingCycle === "monthly" ? 1 : 12;
+  let advanced = nextBillingDate;
+  while (advanced <= today) {
+    const next = addMonthsClamped(advanced, monthsToAdd);
+    if (next === advanced) return nextBillingDate;
+    advanced = next;
+  }
+  return advanced;
+}
+
+function advanceDueSubscriptions(subscriptions: Subscription[]) {
+  return subscriptions.map((subscription) => ({
+    ...subscription,
+    nextBillingDate: advanceBillingDate(
+      subscription.nextBillingDate,
+      subscription.billingCycle,
+    ),
+  }));
+}
+
 export function ExpensesProvider({ children }: { children: React.ReactNode }) {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
@@ -41,7 +104,7 @@ export function ExpensesProvider({ children }: { children: React.ReactNode }) {
     queueMicrotask(() => {
       if (cancelled) return;
       setExpenses(localStorageStore.load());
-      setSubscriptions(subscriptionsStorageStore.load());
+      setSubscriptions(advanceDueSubscriptions(subscriptionsStorageStore.load()));
       setHydrated(true);
     });
 
@@ -59,6 +122,15 @@ export function ExpensesProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (hydrated) subscriptionsStorageStore.save(subscriptions);
   }, [subscriptions, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const intervalId = window.setInterval(() => {
+      setSubscriptions((prev) => advanceDueSubscriptions(prev));
+    }, 60 * 60 * 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [hydrated]);
 
   const addExpense = useCallback((input: ExpenseInput) => {
     const expense: Expense = {
