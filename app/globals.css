@@ -1,26 +1,64 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/*
+ * Design tokens derived from DESIGN.md (Vercel-inspired design language).
+ * A stark ink-on-canvas system: near-white surfaces, ink-near-black text,
+ * hairline dividers, subtle stacked-shadow elevation, mono for the technical
+ * layer. This is an in-product surface, so it uses the in-app 6px radius for
+ * controls rather than the marketing 100px pill.
+ */
+@theme {
+  /* Surfaces */
+  --color-canvas: #ffffff;
+  --color-canvas-soft: #fafafa;
+  --color-canvas-soft-2: #f5f5f5;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  /* Ink & text */
+  --color-ink: #171717;
+  --color-body: #4d4d4d;
+  --color-mute: #888888;
+  --color-on-primary: #ffffff;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* Lines */
+  --color-hairline: #ebebeb;
+  --color-hairline-strong: #a1a1a1;
+
+  /* Accent & semantic (the only colors the brand permits) */
+  --color-link: #0070f3;
+  --color-error: #ee0000;
+  --color-error-soft: #f7d4d6;
+  --color-error-deep: #c50000;
+  --color-warning: #f5a623;
+
+  /* Radii — in-app scale */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  /* Stacked-shadow elevation (DESIGN.md Levels 2–4) — never a single heavy drop */
+  --shadow-card:
+    0px 1px 1px #00000005, 0px 2px 2px #0000000a, 0px 0px 0px 1px #00000014;
+  --shadow-float:
+    0px 2px 2px #0000000a, 0px 8px 16px -4px #0000000a,
+    0px 0px 0px 1px #00000014;
+
+  /* Type — Geist sans for everything narrative, Geist Mono for the technical layer */
+  --font-sans: var(--font-geist-sans), Inter, system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Aliases kept for any leftover references */
+  --color-background: var(--color-canvas-soft);
+  --color-foreground: var(--color-ink);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-canvas-soft);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+/* Brand selection treatment */
+::selection {
+  background: #171717;
+  color: #f2f2f2;
 }
