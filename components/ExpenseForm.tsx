@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useExpenses } from "@/lib/expenses-context";
 import { CATEGORIES } from "@/lib/categories";
 import { todayISO } from "@/lib/format";
+import { hrefWithParam } from "@/lib/url-params";
 import type { Category, Expense } from "@/lib/types";
 
 interface ExpenseFormProps {
@@ -33,8 +35,19 @@ function formFromExpense(expense: Expense | null) {
   };
 }
 
-export default function ExpenseForm({ editing, onDone }: ExpenseFormProps) {
+export default function ExpenseForm(props: ExpenseFormProps) {
+  return (
+    <Suspense>
+      <ExpenseFormContent {...props} />
+    </Suspense>
+  );
+}
+
+function ExpenseFormContent({ editing, onDone }: ExpenseFormProps) {
   const { addExpense, updateExpense } = useExpenses();
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [form, setForm] = useState(() => formFromExpense(editing));
   const [error, setError] = useState<string | null>(null);
 
@@ -65,6 +78,12 @@ export default function ExpenseForm({ editing, onDone }: ExpenseFormProps) {
     }
     setForm(emptyForm());
     setError(null);
+    const savedMonth = monthFromDate(input.date);
+    if (savedMonth) {
+      router.replace(hrefWithParam(pathname, searchParams, "month", savedMonth), {
+        scroll: false,
+      });
+    }
     onDone();
   }
 
@@ -162,7 +181,7 @@ export default function ExpenseForm({ editing, onDone }: ExpenseFormProps) {
         {editing && (
           <button
             type="button"
-            onClick={onDone}
+            onClick={() => onDone()}
             className="h-10 rounded-sm border border-hairline bg-canvas px-4 text-sm font-medium text-ink transition-colors hover:bg-canvas-soft-2"
           >
             Cancel
@@ -171,4 +190,8 @@ export default function ExpenseForm({ editing, onDone }: ExpenseFormProps) {
       </div>
     </form>
   );
+}
+
+function monthFromDate(iso: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso.slice(0, 7) : null;
 }

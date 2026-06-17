@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useExpenses } from "@/lib/expenses-context";
+import { hrefWithParam } from "@/lib/url-params";
 import SummaryHeader from "@/components/SummaryHeader";
 import ExpenseForm from "@/components/ExpenseForm";
 import ExpenseList from "@/components/ExpenseList";
@@ -26,14 +28,6 @@ export default function Home() {
     setEditingSubscription(null);
   }
 
-  const tabClass = (tab: ActiveTab) =>
-    [
-      "h-9 rounded-sm px-3 text-sm font-medium transition-colors",
-      activeTab === tab
-        ? "bg-ink text-on-primary"
-        : "text-body hover:bg-canvas-soft-2 hover:text-ink",
-    ].join(" ");
-
   return (
     <>
       <ThemeToggle />
@@ -47,27 +41,7 @@ export default function Home() {
               Track expenses and recurring subscriptions.
             </p>
           </div>
-          <div
-            className="grid w-full grid-cols-2 gap-1 rounded-md border border-hairline bg-canvas p-1 shadow-card sm:w-auto"
-            aria-label="Finance views"
-          >
-            <button
-              type="button"
-              onClick={() => selectTab("expenses")}
-              className={tabClass("expenses")}
-              aria-pressed={activeTab === "expenses"}
-            >
-              Expenses
-            </button>
-            <button
-              type="button"
-              onClick={() => selectTab("subscriptions")}
-              className={tabClass("subscriptions")}
-              aria-pressed={activeTab === "subscriptions"}
-            >
-              Subscriptions
-            </button>
-          </div>
+          <FinanceTabs activeTab={activeTab} onSelectTab={selectTab} />
         </header>
 
         {!hydrated ? (
@@ -95,5 +69,76 @@ export default function Home() {
         )}
       </main>
     </>
+  );
+}
+
+interface FinanceTabsProps {
+  activeTab: ActiveTab;
+  onSelectTab: (tab: ActiveTab) => void;
+}
+
+function FinanceTabs(props: FinanceTabsProps) {
+  return (
+    <Suspense
+      fallback={
+        <TabButtons
+          activeTab={props.activeTab}
+          onSelectTab={props.onSelectTab}
+        />
+      }
+    >
+      <FinanceTabsWithUrl {...props} />
+    </Suspense>
+  );
+}
+
+function FinanceTabsWithUrl({ activeTab, onSelectTab }: FinanceTabsProps) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  function handleSelectTab(tab: ActiveTab) {
+    onSelectTab(tab);
+    if (tab === "subscriptions" && searchParams.has("month")) {
+      router.replace(hrefWithParam(pathname, searchParams, "month", null), {
+        scroll: false,
+      });
+    }
+  }
+
+  return <TabButtons activeTab={activeTab} onSelectTab={handleSelectTab} />;
+}
+
+function TabButtons({ activeTab, onSelectTab }: FinanceTabsProps) {
+  const tabClass = (tab: ActiveTab) =>
+    [
+      "h-9 rounded-sm px-3 text-sm font-medium transition-colors",
+      activeTab === tab
+        ? "bg-ink text-on-primary"
+        : "text-body hover:bg-canvas-soft-2 hover:text-ink",
+    ].join(" ");
+
+  return (
+    <div
+      className="grid w-full grid-cols-2 gap-1 rounded-md border border-hairline bg-canvas p-1 shadow-card sm:w-auto"
+      aria-label="Finance views"
+    >
+      <button
+        type="button"
+        onClick={() => onSelectTab("expenses")}
+        className={tabClass("expenses")}
+        aria-pressed={activeTab === "expenses"}
+      >
+        Expenses
+      </button>
+      <button
+        type="button"
+        onClick={() => onSelectTab("subscriptions")}
+        className={tabClass("subscriptions")}
+        aria-pressed={activeTab === "subscriptions"}
+      >
+        Subscriptions
+      </button>
+    </div>
   );
 }
