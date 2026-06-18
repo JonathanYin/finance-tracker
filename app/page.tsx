@@ -11,6 +11,7 @@ import SubscriptionForm from "@/components/SubscriptionForm";
 import SubscriptionList from "@/components/SubscriptionList";
 import SubscriptionsSummary from "@/components/SubscriptionsSummary";
 import ThemeToggle from "@/components/ThemeToggle";
+import AccountControl from "@/components/AccountControl";
 import type { Expense, Subscription } from "@/lib/types";
 
 type ActiveTab = "expenses" | "subscriptions";
@@ -41,7 +42,10 @@ export default function Home() {
               Track expenses and recurring subscriptions.
             </p>
           </div>
-          <FinanceTabs activeTab={activeTab} onSelectTab={selectTab} />
+          <div className="flex flex-col gap-3 sm:items-end">
+            <AccountControl />
+            <FinanceTabs activeTab={activeTab} onSelectTab={selectTab} />
+          </div>
         </header>
 
         {!hydrated ? (

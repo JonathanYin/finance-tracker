@@ -51,7 +51,7 @@ function ExpenseFormContent({ editing, onDone }: ExpenseFormProps) {
   const [form, setForm] = useState(() => formFromExpense(editing));
   const [error, setError] = useState<string | null>(null);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const amount = parseFloat(form.amount);
     if (!Number.isFinite(amount) || amount <= 0) {
@@ -71,10 +71,15 @@ function ExpenseFormContent({ editing, onDone }: ExpenseFormProps) {
       merchant: form.merchant.trim(),
     };
 
-    if (editing) {
-      updateExpense(editing.id, input);
-    } else {
-      addExpense(input);
+    try {
+      if (editing) {
+        await updateExpense(editing.id, input);
+      } else {
+        await addExpense(input);
+      }
+    } catch {
+      setError("Unable to save expense.");
+      return;
     }
     setForm(emptyForm());
     setError(null);

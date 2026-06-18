@@ -47,15 +47,22 @@ export interface Subscription {
 export type SubscriptionInput = Omit<Subscription, "id" | "createdAt">;
 
 /**
- * Persistence boundary. The MVP ships a localStorage implementation, but a
- * future API / bank-sync store can be dropped in behind the same interface.
+ * Persistence boundary. The app ships localStorage and Supabase
+ * implementations; components stay behind this interface.
  */
 export interface ExpenseStore {
-  load(): Expense[];
-  save(expenses: Expense[]): void;
+  load(): Promise<Expense[]>;
+  upsert(expenses: Expense[]): Promise<void>;
+  remove(id: string): Promise<void>;
 }
 
 export interface SubscriptionStore {
-  load(): Subscription[];
-  save(subscriptions: Subscription[]): void;
+  load(): Promise<Subscription[]>;
+  upsert(subscriptions: Subscription[]): Promise<void>;
+  remove(id: string): Promise<void>;
+}
+
+export interface AuthActionResult {
+  error?: string;
+  message?: string;
 }

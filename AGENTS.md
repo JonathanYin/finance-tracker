@@ -12,16 +12,17 @@ both Claude Code and other agents stay in sync.
 
 ## What this is
 
-A personal finance tracker. The MVP lets you add / edit / delete expenses,
-persisted in the browser via `localStorage`. No backend, database, or auth.
-Single client-rendered page.
+A personal finance tracker. The MVP lets you add / edit / delete expenses and
+recurring subscriptions. Signed-out users persist data in the browser via
+`localStorage`; signed-in users persist data through Supabase Auth + Supabase
+Postgres with Row Level Security. Single client-rendered dashboard page.
 
 ## Stack
 
 - Next.js 16 (App Router) + React 19 + TypeScript (strict)
 - Tailwind CSS v4 (configured via `@theme` in `app/globals.css`, no JS config)
-- No runtime dependencies beyond the framework — uses native `Intl` and
-  `crypto.randomUUID`. Do not add libraries without a clear need.
+- Runtime dependencies are intentionally light: the framework plus Supabase for
+  account-backed persistence. Use native `Intl` and `crypto.randomUUID`.
 
 ## Commands
 
@@ -42,21 +43,29 @@ app/
   globals.css           # design tokens (see Design) + Tailwind import
 components/
   SummaryHeader.tsx     # total / this-year / this-month + by-category breakdown
+  AccountControl.tsx    # guest / sign-in / sign-up / sign-out UI
   ExpenseForm.tsx       # shared add + edit form
   ExpenseList.tsx       # list sorted by date desc
   ExpenseItem.tsx       # one row (details + Edit/Delete)
+  SubscriptionsSummary.tsx # subscription run-rate and next-charge summary
+  SubscriptionForm.tsx  # add + edit subscription
+  SubscriptionList.tsx  # subscription rows
 lib/
   types.ts              # Expense, ExpenseInput, Category, ExpenseSource, ExpenseStore
   categories.ts         # preset CATEGORIES + shared BADGE_CLASS
-  storage.ts            # localStorageStore: ExpenseStore (key finance-tracker:expenses)
+  storage.ts            # localStorage + Supabase stores
+  supabase/             # client/server/proxy helpers for Supabase sessions
   format.ts             # formatCurrency / formatDate / todayISO
   expenses-context.tsx  # ExpensesProvider + useExpenses() hook
   README.md             # data-layer extension notes (READ before changing the model)
+supabase/
+  schema.sql            # tables, indexes, and RLS policies
 ```
 
 Data flow: components call `useExpenses()` → mutations update state and persist
-through `localStorageStore`. Every expense gets `id`, `createdAt`, and a
-`source` field (`"manual"` today) on create.
+through the active store. Guest mode uses `localStorageStore`; signed-in mode
+uses Supabase stores and imports local guest data once per user. Every expense
+gets `id`, `createdAt`, and a `source` field (`"manual"` today) on create.
 
 ## Conventions & gotchas
 
@@ -66,6 +75,11 @@ through `localStorageStore`. Every expense gets `id`, `createdAt`, and a
   There's a `hydrated` flag; the page shows a loading state until it's true.
 - Dates are ISO `yyyy-mm-dd` strings, parsed as local time in `format.ts` to
   avoid UTC off-by-one. Use `todayISO()` for defaults.
+- Account-backed persistence needs `NEXT_PUBLIC_SUPABASE_URL`,
+  `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and `supabase/schema.sql` applied in
+  Supabase. If env vars are missing, the app stays in guest mode.
+- Never put Supabase secret/service-role keys in client code. Browser writes
+  rely on RLS policies scoped to `auth.uid() = user_id`.
 - Match the existing style: Tailwind utility classes only, tokens over raw
   colors (e.g. `text-ink`, `bg-canvas`, `border-hairline`).
 
@@ -101,4 +115,5 @@ Future direction — see `lib/README.md` for the detailed model implications:
 
 - Don't introduce a hosting/deploy step or recommend a host without asking; this
   runs locally via `npm run dev` for now.
-- Keep the MVP dependency-light and the storage layer behind `ExpenseStore`.
+- Keep the MVP dependency-light and the storage layer behind `ExpenseStore` /
+  `SubscriptionStore`.

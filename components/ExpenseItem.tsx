@@ -47,7 +47,7 @@ export default function ExpenseItem({ expense, onEdit }: ExpenseItemProps) {
         </button>
         <button
           type="button"
-          onClick={() => deleteExpense(expense.id)}
+          onClick={() => void deleteExpense(expense.id)}
           className="rounded-sm px-2 py-1 text-sm text-error transition-colors hover:bg-error-soft"
           aria-label="Delete expense"
         >

@@ -48,7 +48,7 @@ export default function SubscriptionForm({
   const [form, setForm] = useState(() => formFromSubscription(editing));
   const [error, setError] = useState<string | null>(null);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const amount = parseFloat(form.amount);
     if (!form.name.trim()) {
@@ -74,10 +74,15 @@ export default function SubscriptionForm({
       notes: form.notes.trim(),
     };
 
-    if (editing) {
-      updateSubscription(editing.id, input);
-    } else {
-      addSubscription(input);
+    try {
+      if (editing) {
+        await updateSubscription(editing.id, input);
+      } else {
+        await addSubscription(input);
+      }
+    } catch {
+      setError("Unable to save subscription.");
+      return;
     }
     setForm(emptyForm());
     setError(null);

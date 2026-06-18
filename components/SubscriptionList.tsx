@@ -81,7 +81,7 @@ export default function SubscriptionList({ onEdit }: SubscriptionListProps) {
               </button>
               <button
                 type="button"
-                onClick={() => deleteSubscription(subscription.id)}
+                onClick={() => void deleteSubscription(subscription.id)}
                 className="rounded-sm px-2 py-1 text-sm text-error transition-colors hover:bg-error-soft"
                 aria-label="Delete subscription"
               >
