@@ -103,6 +103,7 @@ function PaginatedExpenseList({ onEdit }: ExpenseListProps) {
       : EXPENSES_PER_BATCH;
   const visibleExpenses = selectedEntry.expenses.slice(0, visibleCount);
   const remainingCount = selectedEntry.expenses.length - visibleExpenses.length;
+  const selectedMonthLabel = formatMonth(selectedEntry.month);
 
   function goToMonth(month: string) {
     router.replace(hrefWithParam(pathname, searchParams, "month", month), {
@@ -119,7 +120,7 @@ function PaginatedExpenseList({ onEdit }: ExpenseListProps) {
               Showing
             </div>
             <h2 className="mt-1 text-lg font-semibold tracking-tight text-ink">
-              {formatMonth(selectedEntry.month)}
+              {selectedMonthLabel}
             </h2>
             <p className="mt-1 text-sm text-body">
               {selectedEntry.expenses.length}{" "}
@@ -134,18 +135,35 @@ function PaginatedExpenseList({ onEdit }: ExpenseListProps) {
             <label className="sr-only" htmlFor="expense-month">
               Select expense month
             </label>
-            <select
-              id="expense-month"
-              value={selectedEntry.month}
-              onChange={(event) => goToMonth(event.target.value)}
-              className="h-9 rounded-sm border border-hairline bg-canvas px-3 text-sm text-ink outline-none focus:border-hairline-strong"
-            >
-              {months.map((entry) => (
-                <option key={entry.month} value={entry.month}>
-                  {formatMonth(entry.month)}
-                </option>
-              ))}
-            </select>
+            <div className="group relative inline-flex">
+              <div className="pointer-events-none flex h-9 items-center gap-5 rounded-sm border border-hairline bg-canvas py-0 pl-3 pr-3 text-sm text-ink group-focus-within:border-hairline-strong">
+                <span>{selectedMonthLabel}</span>
+                <svg
+                  aria-hidden="true"
+                  className="h-4 w-4 shrink-0 text-ink"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </div>
+              <select
+                id="expense-month"
+                value={selectedEntry.month}
+                onChange={(event) => goToMonth(event.target.value)}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              >
+                {months.map((entry) => (
+                  <option key={entry.month} value={entry.month}>
+                    {formatMonth(entry.month)}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             <div className="grid grid-cols-2 gap-2">
               <button
