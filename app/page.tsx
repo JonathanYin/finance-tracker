@@ -33,13 +33,34 @@ export default function Home() {
       <ThemeToggle />
       <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 sm:py-12">
         <header className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h1 className="mb-1 text-2xl font-semibold tracking-tight text-ink">
-              Finance Tracker
-            </h1>
-            <p className="text-sm text-body">
-              Track expenses and recurring subscriptions.
-            </p>
+          <div className="flex items-center gap-3">
+            <span
+              className="flex size-10 shrink-0 items-center justify-center rounded-md bg-ink text-on-primary shadow-card"
+              aria-hidden="true"
+            >
+              <svg
+                className="size-7"
+                viewBox="0 0 64 64"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M18 23h28M18 32h17M18 42l9-9 7 6 12-16"
+                  stroke="currentColor"
+                  strokeWidth="5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </span>
+            <div>
+              <h1 className="mb-1 text-2xl font-semibold tracking-tight text-ink">
+                Finance Tracker
+              </h1>
+              <p className="text-sm text-body">
+                Track expenses and recurring subscriptions.
+              </p>
+            </div>
           </div>
           <FinanceTabs activeTab={activeTab} onSelectTab={selectTab} />
         </header>
